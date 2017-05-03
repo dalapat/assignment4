@@ -2,7 +2,8 @@ import os
 import argparse
 import sys
 import pickle
-from Methods import ClassificationLabel, FeatureVector, Instance, Predictor, DecisionTree, NaiveBayes, NeuralNetwork
+from Naive2 import NaiveBayes
+from Methods import ClassificationLabel, FeatureVector, Instance, Predictor #DecisionTree, NeuralNetwork
 
 def load_data(filename):
 	instances = []
@@ -43,11 +44,20 @@ def get_args():
 
 	return args
 
-def predict(predictor, instances):
-	for instance in instances:
-		label = predictor.predict(instance)
+def getInstances(instances):
+    res = 0
+    for instance in instances: res += 1
+    return res
 
-		print(str(label))
+def predict(predictor, instances):
+    count = 0
+    total = getInstances(instances)
+    for instance in instances:
+        actual = instance.getLabel().getLabel()
+        predicted = predictor.predict(instance)
+        if actual == predicted: count += 1
+        print(str(predicted))
+    print count / float(total)
 
 def check_args(args):
 	if args.mode.lower() == "train":
@@ -66,7 +76,7 @@ def train(instances, algorithm):
 	if algorithm == "decision_tree":
 		predictor = DecisionTree()
 	"""
-	predictor = None # you want to change this depending on the algorithm you're using
+	if algorithm == "naive_bayes": predictor = NaiveBayes()
 	predictor.train(instances)
 	return predictor
 

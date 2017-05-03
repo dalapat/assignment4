@@ -18,6 +18,9 @@ class ClassificationLabel(Label):
         print self.label_str
         pass
 
+    def getLabel(self):
+        return self.label_str
+
 # the feature vectors will be stored in dictionaries so that they can be sparse structures
 class FeatureVector:
     def __init__(self):
@@ -31,12 +34,24 @@ class FeatureVector:
     def get(self, index):
         val = self.feature_vec[index]
         return val
+
+    def getFeatureVec(self):
+        return self.feature_vec
+
+    def __len__(self):
+        return len(self.feature_vec)
         
 
 class Instance:
     def __init__(self, feature_vector, label):
         self._feature_vector = feature_vector
         self._label = label
+
+    def getFeatureVector(self):
+        return self._feature_vector
+
+    def getLabel(self):
+        return self._label
 
 # abstract base class for defining predictors
 class Predictor:
