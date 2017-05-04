@@ -1,22 +1,18 @@
 __author__ = 'anishdalal'
 import numpy as np
 from Methods import Predictor
+from Node import Node
+import math
+import sys
 class DecisionTree(Predictor):
 
-    class Node():
-
-        def __init__(self, attr_label):
-            self.attr_label = attr_label
-            self.examples = []
-            self.brances = []
-
-        def add_branch(self, branch):
-            self.brances.append(branch)
 
     def __init__(self):
         self.root = None
+        self.examples = []
         self.distinct_labels = {}
         self.full_labels = []
+        self.igr = ""
 
     def convertInstancesToNPArray(self, instances):
         temp = []
@@ -78,17 +74,102 @@ class DecisionTree(Predictor):
         u = np.unique(vector)
         if len(u) == 1: return True
 
+    def getAttributeSet(self, instances):
+        fv = instances[0].getFeatureVector().getFeatureVec()
+        return fv.keys()
+
+    def getEntropy(self, subset_of_instances):
+        # operates on a subset of the instances grouped by attribute value
+        label_dict = self.getLabelCount(subset_of_instances)
+        totalNumLabel = sum(label_dict.values())
+        entropy = 0.0
+        for count in label_dict.values():
+            entropy += -(count / float(totalNumLabel)) * math.log((count / float(totalNumLabel)), 2)
+        return entropy
+
+    def getLabelCount(self, instances):
+        label_dict = {}
+        for instance in instances:
+            label = instance.getLabel().getLabel()
+            if label in label_dict:
+                label_dict[label] += 1
+            else:
+                label_dict[label] = 1
+        return label_dict
+
+    def getInfoGain(self, attr_index, instances):
+        entropy = self.getEntropy(instances)
+        # group examples by attribute value
+        groups = {}
+        for instance in instances:
+            if instance.getFeatureVector().get(attr_index) in groups:
+                groups[instance.getFeatureVector().get(attr_index)].append(instance)
+            else:
+                groups[instance.getFeatureVector().get(attr_index)] = [instance]
+        remain = 0.0
+        for subset in groups.values():
+            remain += (len(subset) / float(len(instances))) * self.getEntropy(subset)
+        return entropy - remain
+
+    def getImportantAttribute(self, instances):
+        maxattr_index = None
+        max_information_gain = -sys.maxint
+        attribute_set = self.getAttributeSet(instances)
+        for attribute in attribute_set:
+            ig = self.getInfoGain(attribute, instances)
+            if self.igr == "igr" and not ig == 0:
+                ig /= self.getInstrinsicValue(attribute, self.examples)
+            if ig > max_information_gain:
+                max_information_gain = ig
+                maxattr_index = attribute
+        return maxattr_index
+
+    def getDistinctValuesInAttribute(self, attr_index, instances):
+        values = set()
+        for instance in instances:
+            fv = instance.getFeatureVector()
+            values.add(fv.get(attr_index))
+        return list(values)
+
+    def getInstrinsicValue(self, attr_index, instances):
+        values = self.getDistinctValuesInAttribute(attr_index, instances)
+        iv = 0.0
+        for v in values:
+            p = len([e for e in instances if e.getFeatureVector().get(attr_index) == v]) / float(len(instances))
+            iv += -p * math.log(p, 2)
+        return iv
+
+    '''
+    def getEntropyAttribute(self, attribute_index, instances):
+        asarray = self.convertInstancesToNPArray(instances)
+
+
+        distinct_vals_for_attribute = {}
+        vector = asarray[:, attribute_index:attribute_index+1]
+        for poss_value in vector:
+            # poss_value = instance.getLabel().getLabel()
+            if poss_value in distinct_vals_for_attribute:
+                distinct_vals_for_attribute[poss_value] += 1
+            else:
+                distinct_vals_for_attribute[poss_value] = 1
+        numAllValues = sum(distinct_vals_for_attribute.values())
+        entropy = 0.0
+        for numValue in distinct_vals_for_attribute:
+            entropy += -(numValue / float(numAllValues)) * math.log((numValue / float(numAllValues)), 2)
+
+        return entropy
+    '''
 
     def dtl(self, instances, attributes, parent_instances):
         instancesAsArray = self.convertInstancesToNPArray(instances)
         if len(instances) == 0: return self.plurality_value(parent_instances)
         if self.instancesHaveSameClassification(instancesAsArray): return instancesAsArray[0,0]
         if len(attributes) == 0: return self.plurality_value(instances)
-
+        imp_attr_idx = self.getImportantAttribute(instances)
+        node = Node(imp_attr_idx, instances)
 
     def train(self, instances):
-        a = np.random.rand(10)
-        print np.unique(a, return_counts=True)
+        self.examples = instances
 
     def predict(self, instance):
         pass
