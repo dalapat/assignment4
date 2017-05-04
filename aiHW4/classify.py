@@ -88,7 +88,7 @@ def train(instances, algorithm):
 	"""
     if algorithm == "naive_bayes":
         predictor = NaiveBayes()
-    elif algorithm == "test":
+    elif algorithm == "decision_tree":
         predictor = DecisionTree()
     predictor.train(instances)
     return predictor

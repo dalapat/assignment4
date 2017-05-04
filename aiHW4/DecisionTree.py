@@ -1,6 +1,7 @@
 __author__ = 'anishdalal'
 import numpy as np
 from Methods import Predictor
+from copy import copy
 from Node import Node
 import math
 import sys
@@ -26,7 +27,7 @@ class DecisionTree(Predictor):
                 index += 1
             row.insert(0, label)
             temp.append(row)
-        np.unique(np.array(temp), return_counts=True)
+        # np.unique(np.array(temp), return_counts=True)
         return np.array(temp)
 
     def getLabels(self, instances):
@@ -76,7 +77,9 @@ class DecisionTree(Predictor):
 
     def getAttributeSet(self, instances):
         fv = instances[0].getFeatureVector().getFeatureVec()
-        return fv.keys()
+        res = fv.keys()
+        sorted(res)
+        return res
 
     def getEntropy(self, subset_of_instances):
         # operates on a subset of the instances grouped by attribute value
@@ -97,15 +100,27 @@ class DecisionTree(Predictor):
                 label_dict[label] = 1
         return label_dict
 
-    def getInfoGain(self, attr_index, instances):
-        entropy = self.getEntropy(instances)
-        # group examples by attribute value
+    def getPartitionOfAttributeByGroup(self, attr_index, instances):
         groups = {}
         for instance in instances:
             if instance.getFeatureVector().get(attr_index) in groups:
                 groups[instance.getFeatureVector().get(attr_index)].append(instance)
             else:
                 groups[instance.getFeatureVector().get(attr_index)] = [instance]
+        return groups
+
+    def getInfoGain(self, attr_index, instances):
+        entropy = self.getEntropy(instances)
+        # group examples by attribute value
+        '''
+        groups = {}
+        for instance in instances:
+            if instance.getFeatureVector().get(attr_index) in groups:
+                groups[instance.getFeatureVector().get(attr_index)].append(instance)
+            else:
+                groups[instance.getFeatureVector().get(attr_index)] = [instance]
+        '''
+        groups = self.getPartitionOfAttributeByGroup(attr_index, instances)
         remain = 0.0
         for subset in groups.values():
             remain += (len(subset) / float(len(instances))) * self.getEntropy(subset)
@@ -167,9 +182,24 @@ class DecisionTree(Predictor):
         if len(attributes) == 0: return self.plurality_value(instances)
         imp_attr_idx = self.getImportantAttribute(instances)
         node = Node(imp_attr_idx, instances)
+        values_for_attribute = self.getDistinctValuesInAttribute(imp_attr_idx, instances)
+        groups = self.getPartitionOfAttributeByGroup(imp_attr_idx, instances)
+        for value in values_for_attribute:
+            examples = groups[value]
+            attribute_copy = copy(attributes)
+            # print imp_attr_idx
+            # print attribute_copy
+            attribute_copy.remove(imp_attr_idx)
+            child = self.dtl(examples, attribute_copy, instances)
+            node.add_branch(child)
+        return node
+
 
     def train(self, instances):
         self.examples = instances
+        attributes = self.getAttributeSet(instances)
+        # print "attributes", attributes
+        self.root = self.dtl(instances, attributes, instances)
 
     def predict(self, instance):
         pass

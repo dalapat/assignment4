@@ -5,7 +5,10 @@ class Node():
         def __init__(self, attr_label, examples):
             self.attr_label = attr_label
             self.examples = examples
-            self.brances = []
+            self.branches = []
+
+        def getAttrLabel(self):
+            return self.attr_label
 
         def add_branch(self, branch):
-            self.brances.append(branch)
+            self.branches.append(branch)
