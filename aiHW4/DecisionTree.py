@@ -68,6 +68,7 @@ class DecisionTree(Predictor):
 
     def plurality_value(self, instances):
         # select most common output values among a set of examples
+        if instances is None: return None
         return self.getMaxOfLabelFreq(self.getLabelFreqFromSubsetOfInstances(instances))
 
     def instancesHaveSameClassification(self, instancesArray):
@@ -126,10 +127,10 @@ class DecisionTree(Predictor):
             remain += (len(subset) / float(len(instances))) * self.getEntropy(subset)
         return entropy - remain
 
-    def getImportantAttribute(self, instances):
+    def getImportantAttribute(self, attribute_set, instances):
         maxattr_index = None
         max_information_gain = -sys.maxint
-        attribute_set = self.getAttributeSet(instances)
+        # attribute_set = self.getAttributeSet(instances)
         for attribute in attribute_set:
             ig = self.getInfoGain(attribute, instances)
             if self.igr == "igr" and not ig == 0:
@@ -180,17 +181,19 @@ class DecisionTree(Predictor):
         if len(instances) == 0: return self.plurality_value(parent_instances)
         if self.instancesHaveSameClassification(instancesAsArray): return instancesAsArray[0,0]
         if len(attributes) == 0: return self.plurality_value(instances)
-        imp_attr_idx = self.getImportantAttribute(instances)
+        # need to pass in current attribute set
+        imp_attr_idx = self.getImportantAttribute(attributes, instances)
         node = Node(imp_attr_idx, instances)
         values_for_attribute = self.getDistinctValuesInAttribute(imp_attr_idx, instances)
         groups = self.getPartitionOfAttributeByGroup(imp_attr_idx, instances)
+        attributes.remove(imp_attr_idx)
         for value in values_for_attribute:
             examples = groups[value]
-            attribute_copy = copy(attributes)
-            # print imp_attr_idx
-            # print attribute_copy
-            attribute_copy.remove(imp_attr_idx)
-            child = self.dtl(examples, attribute_copy, instances)
+            # attribute_copy = copy(attributes)
+           #  print imp_attr_idx
+            # print attributes
+            # attribute_copy.remove(imp_attr_idx)
+            child = self.dtl(examples, attributes, instances)
             node.add_branch(child)
         return node
 
