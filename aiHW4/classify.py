@@ -60,11 +60,20 @@ def getInstances(instances):
 def predict(predictor, instances):
     count = 0
     total = getInstances(instances)
+
     for instance in instances:
         actual = instance.getLabel().getLabel()
         predicted = predictor.predict(instance)
         if actual == predicted: count += 1
         print(str(predicted))
+
+    '''
+    actual = instance.getLabel().getLabel()
+    predicted = predictor.predict(instance)
+    if actual == predicted: count += 1
+    print(str(predicted))
+    '''
+
     print count / float(total)
 
 
@@ -95,6 +104,8 @@ def train(instances, algorithm):
 
 
 def main():
+
+    
     args = get_args()
     if args.mode.lower() == "train":
         # Load training data.
@@ -113,6 +124,7 @@ def main():
     elif args.mode.lower() == "test":
         # Load the test data.
         instances = load_data(args.data)
+        # instances = load_data(args.data)
 
         predictor = None
         # Load model
@@ -128,6 +140,22 @@ def main():
     else:
         raise Exception("Unrecognized mode.")
 
+    '''
+    instances = load_data("data/house-votes-84.test")
+    # instances = load_data(args.data)
+
+    predictor = None
+    # Load model
+    try:
+        with open("decision_tree.model", 'rb') as reader:
+            predictor = pickle.load(reader)
+    except IOError:
+        raise Exception("Exception while reading the model file.")
+    except pickle.PickleError:
+        raise Exception("Exception while loading pickle.")
+
+    predict(predictor, instances)
+    '''
 
 if __name__ == "__main__":
     main()

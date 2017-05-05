@@ -2,14 +2,30 @@ __author__ = 'anishdalal'
 import numpy as np
 from Methods import Predictor
 from copy import copy
-from Node import Node
 import math
 import sys
+
+class Node():
+
+    def __init__(self, attr_label, examples):
+        self.attr_label = attr_label
+        self.examples = examples
+        self.branches = {}
+
+    def getAttrLabel(self):
+        return self.attr_label
+
+    def getBranch(self, value):
+        return self.branches[value]
+
+    def add_branch(self, value, branch):
+        self.branches[value] = branch
+
 class DecisionTree(Predictor):
 
 
     def __init__(self):
-        self.root = None
+        self.root = {}
         self.examples = []
         self.distinct_labels = {}
         self.full_labels = []
@@ -28,7 +44,9 @@ class DecisionTree(Predictor):
             row.insert(0, label)
             temp.append(row)
         # np.unique(np.array(temp), return_counts=True)
-        return np.array(temp)
+        array = np.array(temp)
+        # if len(array) == 1: return np.array(temp[0])
+        return array
 
     def getLabels(self, instances):
         for instance in instances:
@@ -68,7 +86,7 @@ class DecisionTree(Predictor):
 
     def plurality_value(self, instances):
         # select most common output values among a set of examples
-        if instances is None: return None
+        # if instances is None: return None
         return self.getMaxOfLabelFreq(self.getLabelFreqFromSubsetOfInstances(instances))
 
     def instancesHaveSameClassification(self, instancesArray):
@@ -101,6 +119,16 @@ class DecisionTree(Predictor):
                 label_dict[label] = 1
         return label_dict
 
+    def getPartitionOfAttributeByGroup(self, attr_index):
+        groups = {}
+        for instance in self.examples:
+            if instance.getFeatureVector().get(attr_index) in groups:
+                groups[instance.getFeatureVector().get(attr_index)].append(instance)
+            else:
+                groups[instance.getFeatureVector().get(attr_index)] = [instance]
+        return groups
+
+    '''
     def getPartitionOfAttributeByGroup(self, attr_index, instances):
         groups = {}
         for instance in instances:
@@ -109,19 +137,11 @@ class DecisionTree(Predictor):
             else:
                 groups[instance.getFeatureVector().get(attr_index)] = [instance]
         return groups
+    '''
 
     def getInfoGain(self, attr_index, instances):
         entropy = self.getEntropy(instances)
-        # group examples by attribute value
-        '''
-        groups = {}
-        for instance in instances:
-            if instance.getFeatureVector().get(attr_index) in groups:
-                groups[instance.getFeatureVector().get(attr_index)].append(instance)
-            else:
-                groups[instance.getFeatureVector().get(attr_index)] = [instance]
-        '''
-        groups = self.getPartitionOfAttributeByGroup(attr_index, instances)
+        groups = self.getPartitionOfAttributeByGroup(attr_index) # self.getPartitionOfAttributeByGroup(attr_index, instances)
         remain = 0.0
         for subset in groups.values():
             remain += (len(subset) / float(len(instances))) * self.getEntropy(subset)
@@ -140,12 +160,21 @@ class DecisionTree(Predictor):
                 maxattr_index = attribute
         return maxattr_index
 
+    def getDistinctValuesInAttribute(self, attr_index):
+        values = set()
+        for instance in self.examples:
+            fv = instance.getFeatureVector()
+            values.add(fv.get(attr_index))
+        return list(values)
+
+    '''
     def getDistinctValuesInAttribute(self, attr_index, instances):
         values = set()
         for instance in instances:
             fv = instance.getFeatureVector()
             values.add(fv.get(attr_index))
         return list(values)
+    '''
 
     def getInstrinsicValue(self, attr_index, instances):
         values = self.getDistinctValuesInAttribute(attr_index, instances)
@@ -182,20 +211,17 @@ class DecisionTree(Predictor):
         if self.instancesHaveSameClassification(instancesAsArray): return instancesAsArray[0,0]
         if len(attributes) == 0: return self.plurality_value(instances)
         # need to pass in current attribute set
-        imp_attr_idx = self.getImportantAttribute(attributes, instances)
-        node = Node(imp_attr_idx, instances)
-        values_for_attribute = self.getDistinctValuesInAttribute(imp_attr_idx, instances)
-        groups = self.getPartitionOfAttributeByGroup(imp_attr_idx, instances)
-        attributes.remove(imp_attr_idx)
+        root = self.getImportantAttribute(attributes, instances)
+        tree = {root: {}}
+        values_for_attribute = self.getDistinctValuesInAttribute(root)# self.getDistinctValuesInAttribute(root, instances)
+        groups = self.getPartitionOfAttributeByGroup(root)#self.getPartitionOfAttributeByGroup(root, instances)
+        attributes.remove(root)
         for value in values_for_attribute:
             examples = groups[value]
-            # attribute_copy = copy(attributes)
-           #  print imp_attr_idx
-            # print attributes
-            # attribute_copy.remove(imp_attr_idx)
             child = self.dtl(examples, attributes, instances)
-            node.add_branch(child)
-        return node
+            # if isinstance(child, set): print "%"
+            tree[root][value] = child
+        return tree
 
 
     def train(self, instances):
@@ -204,5 +230,39 @@ class DecisionTree(Predictor):
         # print "attributes", attributes
         self.root = self.dtl(instances, attributes, instances)
 
+    def print_tree(self, node):
+        attr_index = node.keys()[0]
+        print attr_index
+        for value in node[node.keys()[0]]:
+            print value, self.print_tree(node[node.keys()[0]])
+        return
+
+    def recurse(self, node, instance):
+        if not isinstance(node, dict): return node
+        fv = instance.getFeatureVector()
+        attr = fv.get(node.keys()[0])
+        try:
+            # print node[node.keys()[0]]
+            return self.recurse(node[node.keys()[0]][attr], instance)
+        except KeyError:
+            print node[node.keys()[0]], attr
+            # return self.recurse(node[node.keys()[0]][self.findClosestBranch(attr, node)], instance)
+
+    def findClosestBranch(self, attr, node):
+        distinct_vals = self.getDistinctValuesInAttribute(attr, self.examples)
+        min_dist = sys.maxint
+        ret = None
+        for val in distinct_vals:
+            if val in node[node.keys()[0]]:
+                dis = abs(val - attr)
+                if dis < min_dist:
+                    min_dist = dis
+                    ret = val
+        return ret
+
+
     def predict(self, instance):
-        pass
+        val = self.recurse(self.root, instance)
+        return val
+        # print type(self.root)
+        # self.print_tree(self.root)
