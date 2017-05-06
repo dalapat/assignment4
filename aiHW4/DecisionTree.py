@@ -9,13 +9,13 @@ import sys
 class DecisionTree(Predictor):
 
 
-    def __init__(self):
+    def __init__(self, igr="", to_prune=False):
         self.root = {}
         self.examples = []
         self.distinct_labels = {}
         self.full_labels = []
-        self.to_prune = False
-        self.igr = ""
+        self.to_prune = to_prune
+        self.igr = igr
 
     def convertInstancesToNPArray(self, instances):
         temp = []
