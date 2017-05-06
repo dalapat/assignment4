@@ -1,3 +1,5 @@
+from collections import Counter
+
 __author__ = 'anishdalal'
 import numpy as np
 from Methods import Predictor
@@ -29,6 +31,7 @@ class DecisionTree(Predictor):
         self.examples = []
         self.distinct_labels = {}
         self.full_labels = []
+        self.to_prune = False
         self.igr = ""
 
     def convertInstancesToNPArray(self, instances):
@@ -109,6 +112,13 @@ class DecisionTree(Predictor):
             entropy += -(count / float(totalNumLabel)) * math.log((count / float(totalNumLabel)), 2)
         return entropy
 
+    def entropy(self, label_dict):
+        totalNumLabel = sum(label_dict.values())
+        entropy = 0.0
+        for count in label_dict.values():
+            entropy += -(count / float(totalNumLabel)) * math.log((count / float(totalNumLabel)), 2)
+        return entropy
+
     def getLabelCount(self, instances):
         label_dict = {}
         for instance in instances:
@@ -128,16 +138,6 @@ class DecisionTree(Predictor):
                 groups[instance.getFeatureVector().get(attr_index)] = [instance]
         return groups
 
-    '''
-    def getPartitionOfAttributeByGroup(self, attr_index, instances):
-        groups = {}
-        for instance in instances:
-            if instance.getFeatureVector().get(attr_index) in groups:
-                groups[instance.getFeatureVector().get(attr_index)].append(instance)
-            else:
-                groups[instance.getFeatureVector().get(attr_index)] = [instance]
-        return groups
-    '''
 
     def getInfoGain(self, attr_index, instances):
         entropy = self.getEntropy(instances)
@@ -151,6 +151,7 @@ class DecisionTree(Predictor):
         maxattr_index = None
         max_information_gain = -sys.maxint
         # attribute_set = self.getAttributeSet(instances)
+        ig = 0.0
         for attribute in attribute_set:
             ig = self.getInfoGain(attribute, instances)
             if self.igr == "igr" and not ig == 0:
@@ -167,17 +168,9 @@ class DecisionTree(Predictor):
             values.add(fv.get(attr_index))
         return list(values)
 
-    '''
-    def getDistinctValuesInAttribute(self, attr_index, instances):
-        values = set()
-        for instance in instances:
-            fv = instance.getFeatureVector()
-            values.add(fv.get(attr_index))
-        return list(values)
-    '''
 
     def getInstrinsicValue(self, attr_index, instances):
-        values = self.getDistinctValuesInAttribute(attr_index, instances)
+        values = self.getDistinctValuesInAttribute(attr_index)
         iv = 0.0
         for v in values:
             p = len([e for e in instances if e.getFeatureVector().get(attr_index) == v]) / float(len(instances))
@@ -223,12 +216,53 @@ class DecisionTree(Predictor):
             tree[root][value] = child
         return tree
 
+    def pruning(self, instances, attributes, parent_instances):
+        instancesAsArray = self.convertInstancesToNPArray(instances)
+        if len(instances) == 0: return self.plurality_value(parent_instances)
+        if self.instancesHaveSameClassification(instancesAsArray): return instancesAsArray[0,0]
+        if len(attributes) == 0: return self.plurality_value(instances)
+        # need to pass in current attribute set
+        root = self.getImportantAttribute(attributes, instances)
+        tree = {root: {}}
+        labels = self.getLabelFreqFromSubsetOfInstances(instances).keys()
+        values_for_attribute = self.getDistinctValuesInAttribute(root)# self.getDistinctValuesInAttribute(root, instances)
+        groups = self.getPartitionOfAttributeByGroup(root)#self.getPartitionOfAttributeByGroup(root, instances)
+        attributes.remove(root)
+        if self.compute_ig(instances, attributes, labels):
+            for value in values_for_attribute:
+                examples = groups[value]
+                child = self.dtl(examples, attributes, instances)
+                # if isinstance(child, set): print "%"
+                tree[root][value] = child
+        return tree
+
+    def compute_ig(self, instances, attributes, val):
+        count = Counter()
+        check = 0
+        for i in val:
+            count[i] += 1
+        temp = self.entropy(count)
+        gain = {}
+        for a in attributes:
+            # sample = np.copy(set[:, a])
+            gain[a] = self.getInfoGain(a, instances)
+        for k in gain:
+            if gain[k] < 0.04:
+                check += 1
+        if check > (len(instances) / 2):
+            return False
+        else:
+            return True
+
 
     def train(self, instances):
         self.examples = instances
         attributes = self.getAttributeSet(instances)
         # print "attributes", attributes
-        self.root = self.dtl(instances, attributes, instances)
+        if self.to_prune:
+            self.root = self.pruning(instances, attributes, instances)
+        else:
+            self.root = self.dtl(instances, attributes, instances)
 
     def print_tree(self, node):
         attr_index = node.keys()[0]
@@ -239,12 +273,15 @@ class DecisionTree(Predictor):
 
     def recurse(self, node, instance):
         if not isinstance(node, dict): return node
+        if isinstance(node, dict) and len(node.keys()) == 1 and not isinstance(node[node.keys()[0]], dict):
+            return node[node.keys()[0]]
         fv = instance.getFeatureVector()
         attr = fv.get(node.keys()[0])
         try:
             # print node[node.keys()[0]]
             return self.recurse(node[node.keys()[0]][attr], instance)
         except KeyError:
+            print node
             print node[node.keys()[0]], attr
             # return self.recurse(node[node.keys()[0]][self.findClosestBranch(attr, node)], instance)
 
@@ -260,9 +297,27 @@ class DecisionTree(Predictor):
                     ret = val
         return ret
 
+    def getClassificationForNodeToBePruned(self, attr_index):
+        # attr_index = node.keys()[0]
+        groups = self.getPartitionOfAttributeByGroup(attr_index)
+        max_branch = None
+        max_branch_num = 0
+        for branch in groups.keys():
+            if len(groups[branch]) > max_branch_num:
+                max_branch_num = len(groups[branch])
+                max_branch = branch
+        label_freq = self.getLabelFreqFromSubsetOfInstances(groups[max_branch])
+        l = self.getMaxOfLabelFreq(label_freq)
+        return l
+
+    def isLeafNode(self, node):
+        key = node.keys()[0]
+        for branch in node[key]:
+            child = node[key][branch]
+            if isinstance(child, dict):
+                return False
+        return True
 
     def predict(self, instance):
         val = self.recurse(self.root, instance)
         return val
-        # print type(self.root)
-        # self.print_tree(self.root)

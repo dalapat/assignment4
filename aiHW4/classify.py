@@ -4,6 +4,7 @@ import sys
 import pickle
 from NaiveBayes import NaiveBayes
 from DecisionTree import DecisionTree
+from NeuralNetwork import NeuralNetwork
 from Methods import ClassificationLabel, FeatureVector, Instance, Predictor  # , DecisionTree , NeuralNetwork
 
 
@@ -99,13 +100,15 @@ def train(instances, algorithm):
         predictor = NaiveBayes()
     elif algorithm == "decision_tree":
         predictor = DecisionTree()
+    elif algorithm == "neural_network":
+        predictor = NeuralNetwork()
     predictor.train(instances)
     return predictor
 
 
 def main():
 
-    
+
     args = get_args()
     if args.mode.lower() == "train":
         # Load training data.
@@ -141,20 +144,17 @@ def main():
         raise Exception("Unrecognized mode.")
 
     '''
-    instances = load_data("data/house-votes-84.test")
-    # instances = load_data(args.data)
+    instances = load_data("data/house-votes-84.train")
 
-    predictor = None
-    # Load model
+    # Train
+    predictor = train(instances, "neural_network")
     try:
-        with open("decision_tree.model", 'rb') as reader:
-            predictor = pickle.load(reader)
+        with open("neural_network.model", 'wb') as writer:
+            pickle.dump(predictor, writer)
     except IOError:
-        raise Exception("Exception while reading the model file.")
+        raise Exception("Exception while writing to the model file.")
     except pickle.PickleError:
-        raise Exception("Exception while loading pickle.")
-
-    predict(predictor, instances)
+        raise Exception("Exception while dumping pickle.")
     '''
 
 if __name__ == "__main__":
