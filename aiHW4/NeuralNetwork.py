@@ -1,136 +1,109 @@
 from Methods import *
 import numpy as np
-import math
+from scipy.special import expit
 
 
 class NeuralNetwork(Predictor):
-    input_batch = 0
-    labels = []
+    matrix = 0
+    type = []
     input_labels = []
-    input_layers = 2
-    output_layers = 2
-    output_layers = 0.1
-    reg_lambda = 0.01  
-    label_map = {}
-    model = 0
-    numInstances = 0
+    input_layer_dimen = 2
+    output_layer_dimen = 2
+    learning_rate = 0.1
+    regularization = 0.01
+    relate = {}
+    neural_net = 0
+    examples = 0
+    epoch=60000
 
 
     def __init__(self):
-        self.weight_first_layer = 0
-        self.bias_first_layer = 0
-        self.weight_second_layer = 0
-        self.bias_second_layer = 0
-        self.instancesAsNPArray = None
-        self.numInstances = 0  # training set size
-        self.input_layers = 2  # input layer dimensionality
-        self.output_layers = 2  # output layer dimensionality
-        self.output_layers = 0.002  # learning rate for gradient descent
-        self.reg_lambda = 0.05  # regularization strength
-        self.labels = []
-        self.label_map = {}
-        self.input_batch = 0
+        self.examples = 0
+        self.learning_rate = 0.005
         self.input_labels = []
-        self.model = 0
         self.input_label_categories = []
+        self.input_layer_dimen = 2
+        self.output_layer_dimen = 2
+        self.regularization = 0.05
+        self.neural_net = 0
+        self.type = []
+        self.relate = {}
+        self.matrix = 0
 
-    def convertFeatureVectorToList(self, feature_vector):
-        res = []
-        for i in range(len(feature_vector)):
-            res.append(feature_vector.get(i))
-        return res
-
-    def convertInstancesToNPArray(self, instances):
-        mat = []
+    def instance_iter(self, instances, outer):
         for instance in instances:
-            label = instance.getLabel().getLabel()
-            fv = instance.getFeatureVector()
-            fv_as_list = self.convertFeatureVectorToList(fv)
-            fv_as_list.insert(0, label)
-            mat.append(fv_as_list)
-        return np.array(mat)
+            inst_data = []
+            if instance.getLabel().getLabel() not in self.type:
+                self.type.append(instance.getLabel().getLabel())
+                self.relate[len(self.type) - 1] = instance.getLabel().getLabel()
+            self.input_labels.append(instance.getLabel().getLabel())
+            for i in range(0, len(instance.getFeatureVector().getFeatureVec())):
+                inst_data.append(instance.getFeatureVector().getFeatureVec()[i])
+            outer.append(inst_data)
+            self.input_layer_dimen = len(inst_data)
+            self.output_layer_dimen = len(self.type)
 
-    def getLabelsFromInstances(self, instances):
-        arr = self.convertInstancesToNPArray(instances)
-        res_list = []
-        res_dict = {}
-        vector = arr[:, 0:1]
-        for label in np.nditer(vector):
-            label = str(label)
-            res_list.append(label)
-            if label in res_dict:
-                res_dict[label] += 1
-            else:
-                res_dict[label] = 1
-        return (res_list, res_dict)
+    def sift_layers(self, weight_layer_1, weight_layer_2, bias_layer_1, bias_layer_2):
+        output_layer_1 = self.sigmoid(self.matrix.dot(weight_layer_1) + bias_layer_1)
+        scores = np.exp((self.sigmoid(np.dot(self.matrix, weight_layer_1) + bias_layer_1)).dot(weight_layer_2) + bias_layer_2)
+        delt_err = scores / np.sum(scores, axis=1, keepdims=True)
+        delt_err[range(self.examples), self.input_label_categories] -= 1
+        dweight_layer_2 = np.dot(output_layer_1.T, delt_err)
+        dweight_layer_1 = np.dot(self.matrix.T, np.dot(delt_err, weight_layer_2.T) * (1 - np.power(output_layer_1, 2)))
+        return output_layer_1, dweight_layer_1, dweight_layer_2, delt_err
 
-    def getDataAsNPArray(self, instancesAsNPArray):
-        return instancesAsNPArray[:, 1:len(instancesAsNPArray[0])]
+    def sigmoid(self,x):
+        return expit(x)
 
-    def train(self, instances):
-        self.instancesAsNPArray = self.convertInstancesToNPArray(instances)
-        self.labels, self.label_map = self.getLabelsFromInstances(instances)
-        self.input_layers = len(self.instancesAsNPArray[0])
-        self.output_layers = len(self.labels)
-        self.input_batch = self.instancesAsNPArray[:, 1:len(self.instancesAsNPArray[0])]
-        self.numInstances = len(instances)
+    def propagate_vals(self, weight_layer_1, weight_layer_2, bias_layer_1, bias_layer_2):
+        for i in range(0, 60000):
+            a1, dWeight_Layer_1, d_weight_layer_2, delta = self.sift_layers(weight_layer_1, weight_layer_2, bias_layer_1, bias_layer_2)
+            d_weight_layer_2 += self.regularization * weight_layer_2
+            dWeight_Layer_1 += self.regularization * weight_layer_1
+            weight_layer_1 = weight_layer_1 - (self.learning_rate * dWeight_Layer_1)
+            bias_layer_1 = bias_layer_1 - (self.learning_rate * np.sum(np.dot(delta, weight_layer_2.T) * (1 - np.power(a1, 2)), axis=0))
+            weight_layer_2 = weight_layer_2 - (self.learning_rate * d_weight_layer_2)
+            bias_layer_2 = bias_layer_2 - (self.learning_rate * np.sum(delta, axis=0))
+        return weight_layer_1, weight_layer_2, bias_layer_1, bias_layer_2
+
+    def categorical_classify_input(self):
         for label in self.input_labels:
-            for i in range(0, len(self.label_map)):
-                if label == self.label_map[i]:
+            for i in range(0, len(self.relate)):
+                if label == self.relate[i]:
                     self.input_label_categories.append(i)
                     break
 
-        np.random.seed(1)
-        denom = math.pow(self.input_layers, 2)
-        self.weight_first_layer = (2 * np.random.randn(self.input_layers, 20) / denom) - 1
-        self.weight_second_layer = (2 * np.random.randn(20, self.output_layers) / math.pow(20, 2)) - 1
-        self.bias_first_layer = np.zeros((1, 20))
-        self.bias_second_layer = np.zeros((1, self.output_layers))
-
-        self.forwardProp()
-
-    def sigmoid(self,x):
-        return 1 / (1 + math.pow(math.e, -x))
-
-    def forwardProp(self):
-        for i in range(0, 60000):
-
-            # Forward propagation
-            a1 = self.sigmoid(self.input_batch.dot(self.weight_first_layer) + self.bias_first_layer)
-            ret = self.sigmoid(self.input_batch.dot(self.weight_first_layer) + self.bias_first_layer)
-            exp_scores = math.pow(math.e, ret.dot(self.weight_second_layer)+ self.bias_second_layer)
-            probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
-
-            delt = probs
-            delt[range(self.numInstances), self.input_label_categories] -= 1
-            dW2 = (a1.T).dot(delt)
-            db2 = np.sum(delt, axis=0, keepdims=True)
-            dW1 = np.dot(self.input_batch.T, delt.dot(self.weight_second_layer.T) * (1 - math.pow(a1, 2)))
-            db1 = np.sum(delt.dot(self.weight_second_layer.T) * (1 - np.power(a1, 2)), axis=0)
-
-            # Add regularization terms (b1 and b2 don't have regularization terms)
-            dW2 += self.reg_lambda * self.weight_second_layer
-            dW1 += self.reg_lambda * self.weight_first_layer
-
-            # Gradient descent parameter update
-            self.weight_first_layer += -self.output_layers * dW1
-            self.bias_first_layer += -self.output_layers * db1
-            self.weight_second_layer += -self.output_layers * dW2
-            self.bias_second_layer += -self.output_layers * db2
-
-
-    def make_prediction(self, x):
-        # W1, b1, W2, b2 = self.model['W1'], self.model['b1'], self.model['W2'], self.model['b2']
-        val = np.argmax((np.exp((self.sigmoid(x.dot(self.weight_first_layer)
-                                              + self.bias_first_layer)).dot(self.weight_second_layer)
-                                + self.bias_second_layer)) / np.sum((np.exp((self.sigmoid(x.dot(self.weight_first_layer)
-                                + self.bias_second_layer)).dot(self.weight_second_layer)
-                                + self.bias_second_layer)), axis=1, keepdims=True),axis=1)
+    def result(self, x):
+        weight_layer_1 = self.neural_net['weight_layer_1']
+        weight_layer_2 = self.neural_net['weight_layer_2']
+        bias_layer_1 = self.neural_net['bias_layer_1']
+        bias_layer_2 = self.neural_net['bias_layer_2']
+        val = np.argmax((np.exp((self.sigmoid(x.dot(weight_layer_1) + bias_layer_1)).dot(weight_layer_2) + bias_layer_2))
+                        / np.sum((np.exp((self.sigmoid(x.dot(weight_layer_1) + bias_layer_1)).dot(weight_layer_2) + bias_layer_2)),
+                                                                                       axis=1, keepdims=True),axis=1)
         return val
+
+    def train(self, instances):
+        instance_data = []
+        self.instance_iter(instances, instance_data)
+        self.matrix = np.array(instance_data)
+        self.examples = len(self.matrix)
+        self.categorical_classify_input()
+
+        np.random.seed(0)
+        weight_layer_1 = ( 2 * np.random.randn(self.input_layer_dimen, 20) / np.sqrt(self.input_layer_dimen) ) -1
+        weight_layer_2 = ( 2 * np.random.randn(20, self.output_layer_dimen) / np.sqrt(20) )-1
+        bias_layer_1 = np.zeros((1, 20))
+        bias_layer_2 = np.zeros((1, self.output_layer_dimen))
+
+        weight_layer_1, weight_layer_2, bias_layer_1, bias_layer_2 = self.propagate_vals(weight_layer_1, weight_layer_2, bias_layer_1, bias_layer_2)
+        
+        self.neural_net = {'weight_layer_1': weight_layer_1,
+                          'bias_layer_1': bias_layer_1,
+                          'weight_layer_2': weight_layer_2, 'bias_layer_2': bias_layer_2}
 
     def predict(self, instance):
         temp = []
-        for i in xrange(0, len(instance.feature_vector.feature_vec)):
-            temp.append(instance.feature_vector.feature_vec[i])
-            print temp
-        return self.label_map[self.make_prediction(np.array(temp))[0]]
+        for i in range(0, len(instance.getFeatureVector().getFeatureVec())):
+            temp.append(instance.getFeatureVector().getFeatureVec()[i])
+        return self.relate[self.result(np.array(temp))[0]]
