@@ -9,8 +9,8 @@ class NaiveBayes(Predictor):
         self.distinct_classes = {}
         self.all_classes = []
         self.prior = {}
-        self.mean_for_attribute = {} #(class, attribute_index)
-        self.var_for_attribute = {} #(class, attribute_index)
+        self.mean_for_attribute = {}
+        self.var_for_attribute = {} 
         self.num_instances = 0
 
     def getDistinctClasses(self, instances):
