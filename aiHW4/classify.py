@@ -3,6 +3,7 @@ import argparse
 import sys
 import pickle
 from NaiveBayes import NaiveBayes
+from NaiveBayes1 import NaiveBayes
 from DecisionTree import DecisionTree
 from NeuralNetwork import NeuralNetwork
 from Methods import ClassificationLabel, FeatureVector, Instance, Predictor  # , DecisionTree , NeuralNetwork
